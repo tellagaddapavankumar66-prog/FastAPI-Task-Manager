@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taskly - Modern Task Manager</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #4a5568; margin-bottom: 1.5rem; }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-bottom: 10px; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .task-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f7fafc; border-radius: 8px; margin-bottom: 8px; }
+        .done { text-decoration: line-through; color: #a0aec0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🚀 Task Manager</h2>
+        <div id="auth-box">
+            <input type="text" id="u" placeholder="Username">
+            <input type="password" id="p" placeholder="Password">
+            <button class="btn-primary" onclick="handleAuth('/login', true)">Login</button>
+            <button style="background: #edf2f7; color: #4a5568;" onclick="handleAuth('/register')">Register</button>
+        </div>
+        <div id="task-box" style="display:none">
+            <input type="text" id="t" placeholder="What needs to be done?">
+            <button class="btn-primary" onclick="addTask()">Add Task</button>
+            <div id="list"></div>
+            <button style="margin-top:20px; font-size: 12px; background: none; color: red;" onclick="location.reload()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        let token = "";
+        async function handleAuth(path, isLogin=false) {
+            const u = document.getElementById('u').value, p = document.getElementById('p').value;
+            const body = isLogin ? new URLSearchParams({username:u, password:p}) : JSON.stringify({username:u, password:p});
+            const headers = isLogin ? {'Content-Type': 'application/x-www-form-urlencoded'} : {'Content-Type': 'application/json'};
+            const res = await fetch(path, {method:'POST', headers, body});
+            const data = await res.json();
+            if(res.ok) {
+                if(isLogin) { 
+                    token = data.access_token; 
+                    document.getElementById('auth-box').style.display='none'; 
+                    document.getElementById('task-box').style.display='block'; 
+                    load(); 
+                } else alert("Registration Successful!");
+            } else alert(data.detail || "Error occurred");
+        }
+        async function load() {
+            const res = await fetch('/tasks', {headers: {'Authorization': `Bearer ${token}`}});
+            const tasks = await res.json();
+            document.getElementById('list').innerHTML = tasks.map(t => `
+                <div class="task-item">
+                    <span class="${t.completed ? 'done' : ''}">${t.title}</span>
+                    <div>
+                        <button onclick="toggle(${t.id})" style="width:auto; padding:5px 10px; margin:0; background:#cbd5e0;">✓</button>
+                        <button onclick="del(${t.id})" style="width:auto; padding:5px 10px; margin:0; background:#feb2b2;">×</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        async function addTask() {
+            const title = document.getElementById('t').value;
+            if(!title) return;
+            await fetch('/tasks', {method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${token}`}, body: JSON.stringify({title})});
+            document.getElementById('t').value = "";
+            load();
+        }
+        async function toggle(id) { await fetch(`/tasks/${id}`, {method:'PUT', headers:{'Authorization':`Bearer ${token}`}}); load(); }
+        async function del(id) { await fetch(`/tasks/${id}`, {method:'DELETE', headers:{'Authorization':`Bearer ${token}`}}); load(); }
+    </script>
+</body>
+</html>
